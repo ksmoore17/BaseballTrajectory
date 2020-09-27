@@ -4,16 +4,18 @@ namespace BaseballTrajectory
 {
     public class Ball
     {
-        public double Weight
+        //Mass in ounces
+        public double Mass
         { get; set; }
 
-        public double Radius
+        //Circumference in inches
+        public double Circumference
         { get; set; }
 
-        public Ball()
+        public Ball(double mass = 5.125, double circumference = 9.125)
         {
-            Weight = 8.25;
-            Radius = 5;
+            Mass = mass;
+            Circumference = circumference;
         }
     }
 }
