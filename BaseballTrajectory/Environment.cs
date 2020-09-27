@@ -43,9 +43,9 @@ namespace BaseballTrajectory
         { get; set; }
 
         public Environment(
-            double temperature = 22,
+            double temperature = 78,
             double elevation = 0,
-            double pressure = 10,
+            double pressure = 29.92,
             double relativeHumidity = 50,
             double windVelocity = 0,
             double windDirection = 0,
@@ -60,8 +60,11 @@ namespace BaseballTrajectory
             WindHeight = windHeight;
             RelativeHumidity = relativeHumidity;
 
-            svp = 4.5841 * Math.Exp((18.687 - Temperature / 234.5) * Temperature / (257.14 + Temperature));
-            Rho = 0.06261 * 1.2929 * (273 / (Temperature + 273) * (Pressure * Math.Exp(-beta * Elevation) - 0.3783 * RelativeHumidity * svp / 100) / 760);
+            double temperatureC = (5.0 / 9.0) * (Temperature - 32);
+            double pressureInHg = Pressure * 1000 / 39.37;
+
+            svp = 4.5841 * Math.Exp((18.687 - temperatureC / 234.5) * temperatureC / (257.14 + temperatureC));
+            Rho = 0.06261 * 1.2929 * (273 / (temperatureC + 273) * (pressureInHg * Math.Exp(-beta * Elevation) - 0.3783 * RelativeHumidity * svp / 100) / 760);
         }
     }
 }
