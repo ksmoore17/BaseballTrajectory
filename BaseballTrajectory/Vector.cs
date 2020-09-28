@@ -56,6 +56,17 @@ namespace BaseballTrajectory
                );
         }
 
+        public static Vector operator *(double scalar, Vector v1)
+        {
+            return
+               new Vector
+               (
+                  v1.X * scalar,
+                  v1.Y * scalar,
+                  v1.Z * scalar
+               );
+        }
+
         public static Vector operator /(Vector v1, double scalar)
         {
             return
@@ -64,6 +75,17 @@ namespace BaseballTrajectory
                   v1.X / scalar,
                   v1.Y / scalar,
                   v1.Z / scalar
+               );
+        }
+
+        public static Vector operator /(double scalar, Vector v1)
+        {
+            return
+               new Vector
+               (
+                  scalar / v1.X,
+                  scalar / v1.Y,
+                  scalar / v1.Z
                );
         }
 

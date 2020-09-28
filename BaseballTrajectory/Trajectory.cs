@@ -13,9 +13,36 @@ namespace BaseballTrajectory
         private double _timeCurrent = 0;
 
         // Fitted coefficients (from Nathan)
-        private const double _dragCoefficientStatic = .4105;
-        private const double _dragCoefficientDot = .0044;
-        private const double _dragCoefficientSpin = .2017;
+
+        private double _dragCoefficientStatic = .4105;
+        public double DragCoefficientStatic {
+            get {
+                return _dragCoefficientStatic;
+            } 
+            set {
+                _dragCoefficientStatic = value;
+            }
+        }
+
+        private double _dragCoefficientDot = .0044;
+        public double DragCoefficientDot {
+            get {
+                return _dragCoefficientDot;
+            } 
+            set {
+                _dragCoefficientDot = value;
+            }
+        }
+
+        private double _dragCoefficientSpin = .2017;
+        public double DragCoefficientSpin {
+            get {
+                return _dragCoefficientSpin;
+            } 
+            set {
+                _dragCoefficientSpin = value;
+            }
+        }
         private double _dragCoefficient;
 
         // s
@@ -55,6 +82,26 @@ namespace BaseballTrajectory
             }
         }
 
+        private Vector _landingPosition = new Vector();
+
+        public Vector LandingPosition
+        {
+            get
+            {
+                return _landingPosition;
+            }
+        }
+
+        private double _hangTime;
+
+        public double HangTime
+        {
+            get
+            {
+                return _hangTime;
+            }
+        }
+
         // Constructors to have many options for input
 
         public Trajectory(double exitVelocity, double launchAngle, double direction)
@@ -86,6 +133,7 @@ namespace BaseballTrajectory
 
         public Trajectory(Impact impact, Ball ball)
         {
+            // Provide an impact and ball and assume a default environment
             _impact = impact;
             _ball = ball;
             _environment = new Environment();
@@ -93,6 +141,7 @@ namespace BaseballTrajectory
 
         public Trajectory(Impact impact, Environment environment)
         {
+            // Provide an impact and environment and assume a default ball
             _impact = impact;
             _ball = new Ball();
             _environment = environment;
@@ -100,11 +149,11 @@ namespace BaseballTrajectory
 
         public Trajectory(Impact impact, Ball ball, Environment environment)
         {
+            // Provide and impact, a ball, and an environment
             _impact = impact;
             _ball = ball;
             _environment = environment;
         }
-
 
         public void Calculate(double timestep = .01)
         {
@@ -127,28 +176,48 @@ namespace BaseballTrajectory
                 index += 1;
                 _timeCurrent = timestep * index;
 
+                // Update the position and velocity, then the acceleration with this new position and velocity
                 positionCurrent = positionCurrent + velocityCurrent * timestep + accelerationCurrent * (timestep * timestep) / 2;
                 velocityCurrent = velocityCurrent + accelerationCurrent * timestep;
                 accelerationCurrent = CalculateAcceleration(positionCurrent, velocityCurrent);
-                
+
+                // Add this simulated step to the positions dictionary
                 _positions[_timeCurrent] = positionCurrent;
             }
+
+            // Calculating the interpolated landing point
+            double lastPositiveTime = _timeCurrent - timestep;
+            Vector lastPositivePosition = _positions[lastPositiveTime];
+
+            double lastTime = _timeCurrent;
+            Vector lastPosition = positionCurrent;
+
+            double interpolationRatio = lastPosition.Z / (lastPosition.Z - lastPositivePosition.Z);
+
+            _landingPosition = lastPosition - interpolationRatio * (lastPosition - lastPositivePosition);
+
+            _hangTime = lastTime - interpolationRatio * (lastTime - lastPositiveTime);
         }
 
         private void CalculateConstants()
         {
+            // Calculate the constants and values that do not change over time
+
+            // A coefficient used for drag and magnus acceleration related to the properties of the air around the ball
             _c0 = 0.07182 * _environment.Rho * (5.125 / _ball.Mass) * Math.Pow((_ball.Circumference / 9.125), 2);
 
+            // This is a drag coefficient that changes relative to exit velocity around 100
             _dragCoefficient = _dragCoefficientStatic * (1 + _dragCoefficientDot * (100 - _impact.ExitVelocity));
 
             // Vector of initial position
             _positionInitial = _impact.PositionInitial;
 
-            // Vector of the inital velocity
+            // Direction vector of the inital velocity
             _velocityInitial.X = Math.Cos(_impact.LaunchAngle * Math.PI / 180) * Math.Sin(_impact.Direction * Math.PI / 180);
             _velocityInitial.Y = Math.Cos(_impact.LaunchAngle * Math.PI / 180) * Math.Cos(_impact.Direction * Math.PI / 180);
             _velocityInitial.Z = Math.Sin(_impact.LaunchAngle * Math.PI / 180);
 
+            // Scaling to a madnitude
             _velocityInitial *= 1.467 * _impact.ExitVelocity;
 
             double spinSide = 0;
@@ -159,9 +228,12 @@ namespace BaseballTrajectory
             _spinCartesian.Y = (-_impact.SpinBack * Math.Sin(_impact.Direction * Math.PI / 180) - spinSide * Math.Sin(_impact.LaunchAngle * Math.PI / 180) * Math.Cos(_impact.Direction * Math.PI / 180) + spinGyro * _velocityInitial.Y / _velocityInitial.Length()) * Math.PI / 30;
             _spinCartesian.Z = (spinSide * Math.Cos(_impact.LaunchAngle * Math.PI / 180) + spinGyro * _velocityInitial.Z / _velocityInitial.Length()) * Math.PI / 30;
 
+            // Spin magnitude in rad/s
             _omega = _spinCartesian.Length();
+            // ft/s
             _omegaR = (_ball.Circumference / 2 / Math.PI) * _omega / 12;
 
+            // Wind velocity in ft/s
             _windVelocity.X = _environment.WindVelocity * 1.467 * Math.Sin(_environment.WindDirection * Math.PI / 180);
             _windVelocity.Y = _environment.WindVelocity * 1.467 * Math.Cos(_environment.WindDirection * Math.PI / 180);
         }
@@ -179,11 +251,13 @@ namespace BaseballTrajectory
         }
         private Vector CalculateDragAcceleration(double s, double windVelocityRelative, Vector velocity)
         {
+            // Calculate the contribution to acceleration from drag which changes wrt velocity
             double dragCoefficient = _dragCoefficient * (1 + _dragCoefficientSpin * s * s);
 
+            // Max function is used to only consider wind if above wind height
             Vector dragAcceleration = new Vector
             {
-                X = 0,
+                X = -_c0 * dragCoefficient * windVelocityRelative * (velocity.X - Math.Max(_windVelocity.X - _environment.WindHeight, 0)),
                 Y = -_c0 * dragCoefficient * windVelocityRelative * (velocity.Y - Math.Max(_windVelocity.Y - _environment.WindHeight, 0)),
                 Z = -_c0 * dragCoefficient * windVelocityRelative * (velocity.Z)
             };
@@ -193,6 +267,8 @@ namespace BaseballTrajectory
 
         private Vector CalculateMagnusAcceleration(double s, double windVelocityRelative, Vector velocity)
         {
+            // Calculate the contribution to acceleration from magnus effects which changes wrt velocity (lift)
+
             double liftCoefficient = 1 / (2.32 + 0.4 / s);
 
             Vector magnusAcceleration = new Vector
@@ -207,6 +283,7 @@ namespace BaseballTrajectory
 
         private Vector CalculateAcceleration(Vector position, Vector velocity)
         {
+            // Calculates drag + magnus acceleration, then subtracts for gravity to get the total acceleration
             double windVelocityRelative = CalculateRelativeWindVelocity(velocity, _windVelocity, position.Z);
 
             double s = (_omegaR / windVelocityRelative) * Math.Exp(-_timeCurrent / (_tau * 146.7 / velocity.Length()));
@@ -215,6 +292,7 @@ namespace BaseballTrajectory
             Vector magnusAcceleration = CalculateMagnusAcceleration(s, windVelocityRelative, velocity);
 
             Vector acceleration = dragAcceleration + magnusAcceleration;
+            // Acceleration due to gravity in ft/s^2
             acceleration.Z -= 32.17404855643;
 
             return acceleration;

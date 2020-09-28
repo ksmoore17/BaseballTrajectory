@@ -4,11 +4,10 @@ namespace BaseballTrajectory
 {
     public class Environment
     {
-        private const double beta = 0.0001217;
+        // Beta constant
+        public double Beta
+        { get; set; }
 
-        //Saturation Vapor Pressure in mm*hg
-        private readonly double svp;
-             
         //Temperature in f
         public double Temperature
         { get; set; }
@@ -38,9 +37,43 @@ namespace BaseballTrajectory
         public double WindHeight
         { get; set; }
 
+        // Convert F to C
+        private double TemperatureC
+        {
+            get
+            {
+                return (5.0 / 9.0) * (Temperature - 32);
+            }
+        }
+
+        // Convert in Hg to mm Hg
+        private double PressureMmHg
+        {
+            get
+            {
+                return Pressure * 1000 / 39.37;
+            }
+        }
+
+        //Saturation Vapor Pressure in mm*hg
+        public double Svp
+        {
+            get
+            {
+                double temperatureC = TemperatureC;
+
+                return 4.5841 * Math.Exp((18.687 - temperatureC / 234.5) * temperatureC / (257.14 + temperatureC));
+            }
+        }
+
         //Air density in lb/ft^3
         public double Rho
-        { get; set; }
+        {
+            get
+            {
+                return 0.06261 * 1.2929 * (273 / (TemperatureC + 273) * (PressureMmHg * Math.Exp(-Beta * Elevation) - 0.3783 * RelativeHumidity * Svp / 100) / 760);
+            }
+        }
 
         public Environment(
             double temperature = 78,
@@ -60,11 +93,7 @@ namespace BaseballTrajectory
             WindHeight = windHeight;
             RelativeHumidity = relativeHumidity;
 
-            double temperatureC = (5.0 / 9.0) * (Temperature - 32);
-            double pressureInHg = Pressure * 1000 / 39.37;
-
-            svp = 4.5841 * Math.Exp((18.687 - temperatureC / 234.5) * temperatureC / (257.14 + temperatureC));
-            Rho = 0.06261 * 1.2929 * (273 / (temperatureC + 273) * (pressureInHg * Math.Exp(-beta * Elevation) - 0.3783 * RelativeHumidity * svp / 100) / 760);
+            Beta = 0.0001217;
         }
     }
 }
